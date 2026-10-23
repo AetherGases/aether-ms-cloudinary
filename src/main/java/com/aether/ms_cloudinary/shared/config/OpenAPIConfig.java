@@ -1,5 +1,6 @@
 package com.aether.ms_cloudinary.shared.config;
 
+import com.aether.ms_cloudinary.shared.security.AuthenticationKeyFilter;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -33,10 +34,9 @@ public class OpenAPIConfig {
                   .addSecuritySchemes(
                       SecurityConfig.SECURITY,
                       new SecurityScheme()
-                          .name(SecurityConfig.SECURITY)
-                          .type(SecurityScheme.Type.HTTP)
-                          .scheme("bearer")
-                          .bearerFormat("JWT")
+                          .name(AuthenticationKeyFilter.HEADER_NAME)
+                          .type(SecurityScheme.Type.APIKEY)
+                          .in(SecurityScheme.In.HEADER)
                   )
           );
   }

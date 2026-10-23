@@ -7,9 +7,7 @@ A **Aether MS Cloudinary** é o microsserviço responsável pelos endpoints rela
 - Java 21
 - Spring Boot
 - Spring Web MVC
-- Spring Data JPA
-- Hibernate
-- PostgreSQL
+- Spring Security
 - Cloudinary
 - Maven
 - Lombok
@@ -27,8 +25,6 @@ O projeto segue uma arquitetura em camadas, separando responsabilidades em módu
   - Controllers
   - Services
   - DTOs
-- Repositories
-- Entities
 - Configurations
 - Exceptions
 - Validators
@@ -56,8 +52,6 @@ http://localhost:${API_PORT}/swagger-ui/index.html
 
 - Java 21
 - Maven 3.9+
-- Docker
-- Docker Compose
 
 ### Executando a aplicação
 
@@ -73,20 +67,22 @@ Copie a .env.example para a .env
 .env.example -> .env
 ```
 
-Execute o comando abaixo para subir os serviços do Docker necesssários:
-
-```bash
-docker compose up -d
-```
+Defina na `.env` a variável `INTERNAL_AUTHENTICATION_KEY`. Ela é a chave compartilhada usada pelo front-end e pelos demais microsserviços para se autenticar neste serviço.
 
 Entre no VS Code, IntelliJ ou sua IDE de preferência e execute o projeto.
 
-## Banco de dados
+## Autenticação
 
-O projeto utiliza múltiplos bancos de dados:
+Este microsserviço não possui conexão com banco de dados; sua única responsabilidade é a integração com o Cloudinary.
 
-- **PostgreSQL** para dados relacionais.
-- **MongoDB** para documentos e dados não relacionais.
+Todas as rotas `/api/**` exigem o header `authentication-key` com o valor configurado em `INTERNAL_AUTHENTICATION_KEY`:
+
+```http
+GET /api/cloudinary/upload-signature?fileType=IMAGE
+authentication-key: <INTERNAL_AUTHENTICATION_KEY>
+```
+
+Requisições sem o header retornam `401`, assim como requisições com uma chave inválida.
 
 ## Perfis
 

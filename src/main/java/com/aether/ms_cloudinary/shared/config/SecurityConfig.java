@@ -1,44 +1,50 @@
 package com.aether.ms_cloudinary.shared.config;
 
-import com.aether.ms_cloudinary.shared.security.jwt.JwtTokenFilter;
-import com.aether.ms_cloudinary.shared.security.jwt.JwtTokenProvider;
+import com.aether.ms_cloudinary.shared.security.AuthenticationKeyFilter;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 @EnableWebSecurity
 @Configuration
-@RequiredArgsConstructor
 public class SecurityConfig {
-  private final JwtTokenProvider tokenProvider;
-  private final HandlerExceptionResolver handlerExceptionResolver;
-  public static final String SECURITY = "BearerAuth";
+  public static final String SECURITY = "AuthenticationKey";
 
-  @Bean
-  PasswordEncoder passwordEncoder(){
-    return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+  private final String internalAuthenticationKey;
+  private final HandlerExceptionResolver handlerExceptionResolver;
+
+  public SecurityConfig(
+      @Value("${security.internal-authentication-key}") String internalAuthenticationKey,
+      @Qualifier("handlerExceptionResolver") HandlerExceptionResolver handlerExceptionResolver
+  ) {
+    if (!StringUtils.hasText(internalAuthenticationKey)) {
+      throw new IllegalStateException("INTERNAL_AUTHENTICATION_KEY must be set.");
+    }
+
+    this.internalAuthenticationKey = internalAuthenticationKey;
+    this.handlerExceptionResolver = handlerExceptionResolver;
   }
 
   @Bean
-  AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception{
-    return configuration.getAuthenticationManager();
+  UserDetailsService userDetailsService() {
+    return new InMemoryUserDetailsManager();
   }
 
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http){
-    JwtTokenFilter customFilter = new JwtTokenFilter(tokenProvider, handlerExceptionResolver);
+    AuthenticationKeyFilter customFilter = new AuthenticationKeyFilter(internalAuthenticationKey, handlerExceptionResolver);
 
     return http
         .httpBasic(AbstractHttpConfigurer::disable)
@@ -50,18 +56,13 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             authorizeHttpRequests -> authorizeHttpRequests
                 .requestMatchers(
-                    "/api/auth/login",
-                    "/api/auth/refresh/**",
-                    "/api/auth/register",
-                    "/api/auth/reset-password/send-code",
-                    "/api/auth/reset-password/change-password",
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
                 .requestMatchers(
                     "/api/**"
                 ).authenticated()
-                .requestMatchers("/users").denyAll()
+                .anyRequest().denyAll()
 
         ).exceptionHandling(exception -> exception
             .authenticationEntryPoint(

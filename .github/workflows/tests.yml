@@ -13,45 +13,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16.10
-        env:
-          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB }}
-          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
-      mongo:
-        image: mongo:8.0.13
-        env:
-          MONGO_INITDB_ROOT_USERNAME: ${{ secrets.CI_MONGO_USER }}
-          MONGO_INITDB_ROOT_PASSWORD: ${{ secrets.CI_MONGO_PASSWORD }}
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:8.2
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli -a ci_redis_password ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        command: redis-server --requirepass ci_redis_password --appendonly yes
-
     steps:
       - uses: actions/checkout@v4
 
@@ -62,28 +23,8 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Create postgres database schema
-        env:
-          PGPASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-        run: |
-          psql \
-            -h localhost \
-            -p 5432 \
-            -U "${{ secrets.CI_POSTGRES_USER }}" \
-            -d "${{ secrets.CI_POSTGRES_DB }}" \
-            -f src/main/resources/postgresdb/schema.sql    
-
       - name: Test with Maven
         env:
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
-          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB }}
-          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-          MONGO_URL: ${{ secrets.CI_MONGO_URL }}
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          REDIS_PASSWORD: ci_redis_password
           CLOUDINARY_API_KEY: ${{ secrets.CI_CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CI_CLOUDINARY_API_SECRET }}
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CI_CLOUDINARY_CLOUD_NAME }}
