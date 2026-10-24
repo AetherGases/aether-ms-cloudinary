@@ -2,21 +2,15 @@ package com.aether.ms_cloudinary.cloudinary;
 
 import com.aether.ms_cloudinary.cloudinary.dto.output.GenerateUploadSignatureOutputDTO;
 import com.aether.ms_cloudinary.cloudinary.services.CloudinaryService;
-import com.aether.ms_cloudinary.shared.enums.EmployeeStatusEnum;
-import com.aether.ms_cloudinary.shared.persistence.postgres.entities.EmployeeEntity;
-import com.aether.ms_cloudinary.shared.persistence.postgres.repositories.EmployeeRepository;
-import com.aether.ms_cloudinary.shared.security.jwt.JwtTokenProvider;
 import com.aether.ms_cloudinary.shared.services.MessageService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -34,58 +28,17 @@ class CloudinaryControllerTests {
   @Autowired
   private MockMvc mockMvc;
 
-  @Autowired
-  private EmployeeRepository employeeRepository;
+  @Value("${security.internal-authentication-key}")
+  private String authenticationKey;
 
-  @Autowired
-  private JwtTokenProvider jwtTokenProvider;
   @MockitoBean
   private MessageService messageService;
   @MockitoBean
   private CloudinaryService cloudinaryService;
 
-  private final List<Integer> ids = new ArrayList<>();
-
-  private EmployeeEntity employeeActive;
-
-  @BeforeEach
-  void setup() {
-
-    employeeActive = new EmployeeEntity(
-        "12345678902",
-        "Teste",
-        "test@test.com",
-        "senha123",
-        "11977394517",
-        EmployeeStatusEnum.ACTIVE,
-        List.of()
-    );
-
-    employeeActive = employeeRepository.save(employeeActive);
-
-    ids.add(employeeActive.getId());
-  }
-
-  @AfterEach
-  void cleanup() {
-    employeeRepository.deleteAllByIdInBatch(ids);
-    ids.clear();
-  }
-
-  private String generateJwt(EmployeeEntity employee) {
-    return jwtTokenProvider
-        .createAccessToken(
-            employee.getEmail(),
-            List.of()
-        )
-        .accessToken();
-  }
-
   @Test
   @DisplayName("Should return 200 and upload signature")
   void generateUploadSignatureSuccess() throws Exception {
-
-    String token = generateJwt(employeeActive);
 
     var output = new GenerateUploadSignatureOutputDTO(
         "signature-test",
@@ -102,7 +55,7 @@ class CloudinaryControllerTests {
     mockMvc.perform(
             get("/api/cloudinary/upload-signature")
                 .param("fileType", "IMAGE")
-                .header("Authorization", "Bearer " + token)
+                .header("authentication-key", authenticationKey)
         )
         .andExpect(status().isOk())
         .andExpect(
@@ -138,8 +91,6 @@ class CloudinaryControllerTests {
   @DisplayName("Should return 200 when file type is XLSX")
   void generateUploadSignatureXlsx() throws Exception {
 
-    String token = generateJwt(employeeActive);
-
     var output = new GenerateUploadSignatureOutputDTO(
         "signature-xlsx",
         1788097873L,
@@ -155,7 +106,7 @@ class CloudinaryControllerTests {
     mockMvc.perform(
             get("/api/cloudinary/upload-signature")
                 .param("fileType", "XLSX")
-                .header("Authorization", "Bearer " + token)
+                .header("authentication-key", authenticationKey)
         )
         .andExpect(status().isOk())
         .andExpect(
@@ -179,12 +130,10 @@ class CloudinaryControllerTests {
   @DisplayName("Should return 400 when file type is invalid")
   void generateUploadSignatureInvalidFileType() throws Exception {
 
-    String token = generateJwt(employeeActive);
-
     mockMvc.perform(
             get("/api/cloudinary/upload-signature")
                 .param("fileType", "IMAG")
-                .header("Authorization", "Bearer " + token)
+                .header("authentication-key", authenticationKey)
         )
         .andExpect(status().isBadRequest());
 
@@ -195,11 +144,9 @@ class CloudinaryControllerTests {
   @DisplayName("Should return 400 when file type is not provided")
   void generateUploadSignatureWithoutFileType() throws Exception {
 
-    String token = generateJwt(employeeActive);
-
     mockMvc.perform(
             get("/api/cloudinary/upload-signature")
-                .header("Authorization", "Bearer " + token)
+                .header("authentication-key", authenticationKey)
         )
         .andExpect(status().isBadRequest());
 
@@ -207,7 +154,7 @@ class CloudinaryControllerTests {
   }
 
   @Test
-  @DisplayName("Should return 401 when JWT is not provided")
+  @DisplayName("Should return 401 when authentication key is not provided")
   void generateUploadSignatureWithoutAuthentication()
       throws Exception {
 
@@ -221,16 +168,16 @@ class CloudinaryControllerTests {
   }
 
   @Test
-  @DisplayName("Should return 401 when JWT is invalid")
-  void generateUploadSignatureWithInvalidToken()
+  @DisplayName("Should return 401 when authentication key is invalid")
+  void generateUploadSignatureWithInvalidAuthenticationKey()
       throws Exception {
 
     mockMvc.perform(
             get("/api/cloudinary/upload-signature")
                 .param("fileType", "IMAGE")
                 .header(
-                    "Authorization",
-                    "Bearer token-invalido"
+                    "authentication-key",
+                    "chave-invalida"
                 )
         )
         .andExpect(status().isUnauthorized());
