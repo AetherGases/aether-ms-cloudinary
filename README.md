@@ -67,7 +67,10 @@ Copie a .env.example para a .env
 .env.example -> .env
 ```
 
-Defina na `.env` a variável `INTERNAL_AUTHENTICATION_KEY`. Ela é a chave compartilhada usada pelo front-end e pelos demais microsserviços para se autenticar neste serviço.
+Defina na `.env` as variáveis:
+
+- `INTERNAL_AUTHENTICATION_KEY`: chave compartilhada usada pelos demais microsserviços para se autenticar neste serviço.
+- `JWT_SECRET`: o mesmo segredo usado pelo `ms-auth` para assinar os tokens JWT.
 
 Entre no VS Code, IntelliJ ou sua IDE de preferência e execute o projeto.
 
@@ -75,14 +78,25 @@ Entre no VS Code, IntelliJ ou sua IDE de preferência e execute o projeto.
 
 Este microsserviço não possui conexão com banco de dados; sua única responsabilidade é a integração com o Cloudinary.
 
-Todas as rotas `/api/**` exigem o header `authentication-key` com o valor configurado em `INTERNAL_AUTHENTICATION_KEY`:
+Todas as rotas `/api/**` exigem uma das duas formas de autenticação:
+
+1. Header `authentication-key` com o valor configurado em `INTERNAL_AUTHENTICATION_KEY` (comunicação entre serviços):
 
 ```http
 GET /api/cloudinary/upload-signature?fileType=IMAGE
 authentication-key: <INTERNAL_AUTHENTICATION_KEY>
 ```
 
-Requisições sem o header retornam `401`, assim como requisições com uma chave inválida.
+2. Quando o header `authentication-key` não é enviado, é obrigatório um access token JWT emitido pelo `ms-auth`:
+
+```http
+GET /api/cloudinary/upload-signature?fileType=IMAGE
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+O JWT é validado de forma stateless: apenas a assinatura (HMAC256 com `JWT_SECRET`), a expiração e as claims são verificadas, sem nenhuma consulta a banco de dados. Refresh tokens não são aceitos.
+
+Se o header `authentication-key` for enviado, ele tem prioridade e o JWT é ignorado. Requisições sem nenhuma das credenciais, com chave inválida ou com token inválido/expirado retornam `401`.
 
 ## Perfis
 
