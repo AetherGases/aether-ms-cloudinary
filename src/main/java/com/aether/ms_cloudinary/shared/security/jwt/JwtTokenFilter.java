@@ -21,7 +21,6 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    // The authentication-key takes precedence; the JWT is only required when it is absent.
     return request.getHeader(AuthenticationKeyFilter.HEADER_NAME) != null;
   }
 

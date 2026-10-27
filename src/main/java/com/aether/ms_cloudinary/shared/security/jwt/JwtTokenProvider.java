@@ -18,10 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 
-/**
- * Stateless validation of access tokens issued by ms-auth: only the signature, expiration and
- * claims are checked, no user lookup is performed.
- */
 @Component
 public class JwtTokenProvider {
   public static final String HEADER_NAME = "Authorization";
@@ -35,7 +31,6 @@ public class JwtTokenProvider {
       throw new IllegalStateException("JWT_SECRET must be set.");
     }
 
-    // Same key derivation used by ms-auth when signing the tokens.
     String encodedSecretKey = Base64.getEncoder().encodeToString(secretKey.getBytes(StandardCharsets.UTF_8));
 
     this.verifier = JWT.require(Algorithm.HMAC256(encodedSecretKey.getBytes(StandardCharsets.UTF_8))).build();
@@ -72,7 +67,6 @@ public class JwtTokenProvider {
       throw new UnauthorizedException("exception.jwt.invalid-or-expired", e);
     }
 
-    // Refresh tokens carry a jti and must not be accepted as access tokens.
     if (decodedJWT.getId() != null || !StringUtils.hasText(decodedJWT.getSubject())) {
       throw new UnauthorizedException("exception.jwt.invalid-or-expired");
     }
