@@ -29,6 +29,7 @@ public class OpenAPIConfig {
                 )
         )
         .addSecurityItem(new SecurityRequirement().addList(SecurityConfig.SECURITY))
+        .addSecurityItem(new SecurityRequirement().addList(SecurityConfig.BEARER_SECURITY))
           .components(
               new Components()
                   .addSecuritySchemes(
@@ -37,6 +38,13 @@ public class OpenAPIConfig {
                           .name(AuthenticationKeyFilter.HEADER_NAME)
                           .type(SecurityScheme.Type.APIKEY)
                           .in(SecurityScheme.In.HEADER)
+                  )
+                  .addSecuritySchemes(
+                      SecurityConfig.BEARER_SECURITY,
+                      new SecurityScheme()
+                          .type(SecurityScheme.Type.HTTP)
+                          .scheme("bearer")
+                          .bearerFormat("JWT")
                   )
           );
   }

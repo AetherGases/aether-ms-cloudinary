@@ -1,6 +1,8 @@
 package com.aether.ms_cloudinary.shared.config;
 
 import com.aether.ms_cloudinary.shared.security.AuthenticationKeyFilter;
+import com.aether.ms_cloudinary.shared.security.jwt.JwtTokenFilter;
+import com.aether.ms_cloudinary.shared.security.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,12 +23,15 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @Configuration
 public class SecurityConfig {
   public static final String SECURITY = "AuthenticationKey";
+  public static final String BEARER_SECURITY = "BearerAuth";
 
   private final String internalAuthenticationKey;
+  private final JwtTokenProvider tokenProvider;
   private final HandlerExceptionResolver handlerExceptionResolver;
 
   public SecurityConfig(
       @Value("${security.internal-authentication-key}") String internalAuthenticationKey,
+      JwtTokenProvider tokenProvider,
       @Qualifier("handlerExceptionResolver") HandlerExceptionResolver handlerExceptionResolver
   ) {
     if (!StringUtils.hasText(internalAuthenticationKey)) {
@@ -34,6 +39,7 @@ public class SecurityConfig {
     }
 
     this.internalAuthenticationKey = internalAuthenticationKey;
+    this.tokenProvider = tokenProvider;
     this.handlerExceptionResolver = handlerExceptionResolver;
   }
 
@@ -45,11 +51,13 @@ public class SecurityConfig {
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http){
     AuthenticationKeyFilter customFilter = new AuthenticationKeyFilter(internalAuthenticationKey, handlerExceptionResolver);
+    JwtTokenFilter jwtTokenFilter = new JwtTokenFilter(tokenProvider, handlerExceptionResolver);
 
     return http
         .httpBasic(AbstractHttpConfigurer::disable)
         .csrf(AbstractHttpConfigurer::disable)
         .addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(jwtTokenFilter, AuthenticationKeyFilter.class)
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
         )

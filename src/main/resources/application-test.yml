@@ -12,6 +12,8 @@ spring:
 
 security:
   internal-authentication-key: test-internal-authentication-key
+  jwt:
+    secret-key: test-jwt-secret
 
 server:
   port: 0

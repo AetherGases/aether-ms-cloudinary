@@ -12,6 +12,8 @@ spring:
 
 security:
   internal-authentication-key: ${INTERNAL_AUTHENTICATION_KEY}
+  jwt:
+    secret-key: ${JWT_SECRET}
 
 server:
   port: ${API_PORT:8080}
