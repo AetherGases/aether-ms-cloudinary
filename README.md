@@ -1,115 +1,73 @@
 # Aether MS Cloudinary
 
-A **Aether MS Cloudinary** é o microsserviço responsável pelos endpoints relacionados a upload e carregamento de imagens e/ou arquivos para o Cloudinary.
+Microsserviço de mídia do [Aether](https://github.com/AetherGases). Ele **não recebe os arquivos**: apenas emite uma **assinatura de upload** para que o cliente (app ou portal) envie a imagem ou planilha direto ao Cloudinary. Não tem banco de dados.
 
-## Tecnologias utilizadas
+O [Kong](https://github.com/AetherGases/aether-kong-gateway) encaminha `/api/cloudinary` para este serviço.
 
-- Java 21
-- Spring Boot
-- Spring Web MVC
-- Spring Security
-- Cloudinary
-- Maven
-- Lombok
-- Bean Validation (Jakarta Validation)
-- SpringDoc OpenAPI (Swagger)
-- Docker e Docker Compose
-- JUnit 5
-- Mockito
+## Rota
 
-## Arquitetura
+| Método e rota | Descrição |
+| --- | --- |
+| `GET /api/cloudinary/upload-signature?fileType=IMAGE` | Devolve os parâmetros assinados (timestamp, pasta, assinatura, API key) para um upload direto. `fileType` segue o enum `StorageFileTypeEnum` |
 
-O projeto segue uma arquitetura em camadas, separando responsabilidades em módulos como:
+Swagger em `/swagger-ui/index.html`.
 
-- Módulos com funcionalidades que contém:
-  - Controllers
-  - Services
-  - DTOs
-- Configurations
-- Exceptions
-- Validators
-- Tests
-
-## Documentação da API
-
-Após iniciar a aplicação, a documentação pode ser acessada em:
-
-```
-http://localhost:${API_PORT}/swagger-ui.html
+```mermaid
+sequenceDiagram
+  participant C as App / Portal
+  participant M as ms-cloudinary
+  participant CL as Cloudinary
+  C->>M: GET /upload-signature
+  M-->>C: assinatura (HMAC com o API secret)
+  C->>CL: upload direto com a assinatura
+  CL-->>C: URL do arquivo
 ```
 
-ou
-
-```
-http://localhost:${API_PORT}/swagger-ui/index.html
-```
-
-(dependendo da versão do SpringDoc).
-
-## Executando o projeto
-
-### Pré-requisitos
-
-- Java 21
-- Maven 3.9+
-
-### Executando a aplicação
-
-Clone o repositório pelo comado a seguir:
-
-```bash
-git clone https://github.com/AetherGases/aether-ms-cloudinary.git
-cd core-api
-```
-
-Copie a .env.example para a .env
-```bash
-.env.example -> .env
-```
-
-Defina na `.env` as variáveis:
-
-- `INTERNAL_AUTHENTICATION_KEY`: chave compartilhada usada pelos demais microsserviços para se autenticar neste serviço.
-- `JWT_SECRET`: o mesmo segredo usado pelo `ms-auth` para assinar os tokens JWT.
-
-Entre no VS Code, IntelliJ ou sua IDE de preferência e execute o projeto.
+O hub de IA também usa essa rota (com a chave interna) para montar o fluxo de envio de inventários pelo ChatGPT.
 
 ## Autenticação
 
-Este microsserviço não possui conexão com banco de dados; sua única responsabilidade é a integração com o Cloudinary.
+Todas as rotas `/api/**` exigem **uma** das duas credenciais:
 
-Todas as rotas `/api/**` exigem uma das duas formas de autenticação:
+1. Header `authentication-key` com `INTERNAL_AUTHENTICATION_KEY` (chamadas entre serviços).
+2. Sem esse header, um access token JWT do `ms-auth` em `Authorization: Bearer <token>`.
 
-1. Header `authentication-key` com o valor configurado em `INTERNAL_AUTHENTICATION_KEY` (comunicação entre serviços):
+O JWT é validado de forma stateless (assinatura HMAC256 com `JWT_SECRET`, expiração e claims), sem consultar banco, e **refresh tokens são rejeitados**. Se o header `authentication-key` for enviado, ele tem prioridade e o JWT é ignorado. Requisição sem credencial, com chave inválida ou token inválido devolve `401`.
 
-```http
-GET /api/cloudinary/upload-signature?fileType=IMAGE
-authentication-key: <INTERNAL_AUTHENTICATION_KEY>
+## Stack
+
+Java 21, Spring Boot 4.1, Spring Security, SDK do Cloudinary, SpringDoc OpenAPI, Maven, JUnit 5 e Mockito.
+
+```text
+src/main/java/com/aether/ms_cloudinary
+├── cloudinary/   # controller, service, mapper e DTOs da assinatura
+└── shared/       # security (AuthenticationKeyFilter, JwtTokenFilter), config, exceptions, handlers
 ```
 
-2. Quando o header `authentication-key` não é enviado, é obrigatório um access token JWT emitido pelo `ms-auth`:
+## Executando localmente
 
-```http
-GET /api/cloudinary/upload-signature?fileType=IMAGE
-Authorization: Bearer <ACCESS_TOKEN>
+Pré-requisitos: Java 21 e Maven 3.9+. Não precisa de banco.
+
+```bash
+git clone https://github.com/AetherGases/aether-ms-cloudinary.git
+cd aether-ms-cloudinary
+cp .env.example .env
+mvn spring-boot:run
 ```
 
-O JWT é validado de forma stateless: apenas a assinatura (HMAC256 com `JWT_SECRET`), a expiração e as claims são verificadas, sem nenhuma consulta a banco de dados. Refresh tokens não são aceitos.
+| Variável | Descrição |
+| --- | --- |
+| `API_PORT`, `SPRING_PROFILES_ACTIVE` | Porta (padrão `8080`) e perfil |
+| `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET` | Credenciais da conta Cloudinary |
+| `INTERNAL_AUTHENTICATION_KEY` | Chave compartilhada com os demais serviços |
+| `JWT_SECRET` | **O mesmo** segredo do `ms-auth` |
+| `BREVO_*` | Presentes por herança do esqueleto; o serviço não envia e-mails |
 
-Se o header `authentication-key` for enviado, ele tem prioridade e o JWT é ignorado. Requisições sem nenhuma das credenciais, com chave inválida ou com token inválido/expirado retornam `401`.
+## Testes e deploy
 
-## Perfis
+`mvn clean compile test -DskipTests=false` roda no CI. Publicar uma **release** dispara o deploy no EKS pelo workflow compartilhado da organização ([.github](https://github.com/AetherGases/.github)). Na produção, o Secret `aether-env` entrega as variáveis.
 
-O projeto possui configurações separadas para cada ambiente:
+## Pontos de atenção
 
-- `dev`
-- `staging`
-- `prod`
-
-O perfil é definido pela variável e nesse caso representa a de desenvolvimento:
-
-```properties
-SPRING_PROFILES_ACTIVE=dev
-```
-
-ou pela configuração da IDE.
+- `spring.application.name` está como `core-api` e existe uma exceção `CoreApiException`, ambos herdados do monólito arquivado.
+- O `application.yml` exige `BREVO_API_KEY` e variáveis semelhantes mesmo sem usá-las; sem elas o serviço não sobe.
